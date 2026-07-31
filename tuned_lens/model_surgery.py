@@ -71,6 +71,18 @@ Norm = Union[
 ]
 
 
+def _is_qwen_decoder_model(model: th.nn.Module) -> bool:
+    """Check whether a Qwen-family model has a decoder stack tuned-lens can use."""
+    config = getattr(model, "config", None)
+    model_type = getattr(config, "model_type", "")
+    return (
+        isinstance(model_type, str)
+        and model_type.startswith("qwen")
+        and isinstance(getattr(model, "layers", None), th.nn.ModuleList)
+        and getattr(model, "norm", None) is not None
+    )
+
+
 def get_unembedding_matrix(model: Model) -> nn.Linear:
     """The final linear tranformation from the model hidden state to the output."""
     if isinstance(model, tr.PreTrainedModel):
@@ -117,16 +129,13 @@ def get_final_norm(model: Model) -> Norm:
         ),
     ):
         final_layer_norm = base_model.ln_f
-    elif isinstance(
-        base_model,
-        (
-            models.llama.modeling_llama.LlamaModel,
-            models.mistral.modeling_mistral.MistralModel,
-            models.gemma.modeling_gemma.GemmaModel,
-            models.qwen3.modeling_qwen3.Qwen3Model,
-            models.gpt_oss.modeling_gpt_oss.GptOssModel,
-        ),
-    ):
+    elif isinstance(base_model, models.llama.modeling_llama.LlamaModel):
+        final_layer_norm = base_model.norm
+    elif isinstance(base_model, models.mistral.modeling_mistral.MistralModel):
+        final_layer_norm = base_model.norm
+    elif isinstance(base_model, models.gemma.modeling_gemma.GemmaModel):
+        final_layer_norm = base_model.norm
+    elif _is_qwen_decoder_model(base_model):
         final_layer_norm = base_model.norm
     else:
         raise NotImplementedError(f"Unknown model type {type(base_model)}")
@@ -171,16 +180,13 @@ def get_transformer_layers(model: Model) -> tuple[str, th.nn.ModuleList]:
         ),
     ):
         path_to_layers += ["h"]
-    elif isinstance(
-        base_model,
-        (
-            models.gpt_oss.modeling_gpt_oss.GptOssModel,
-            models.qwen3.modeling_qwen3.Qwen3Model,
-            models.llama.modeling_llama.LlamaModel,
-            models.mistral.modeling_mistral.MistralModel,
-            models.gemma.modeling_gemma.GemmaModel,
-        ),
-    ):
+    elif isinstance(base_model, models.llama.modeling_llama.LlamaModel):
+        path_to_layers += ["layers"]
+    elif isinstance(base_model, models.mistral.modeling_mistral.MistralModel):
+        path_to_layers += ["layers"]
+    elif isinstance(base_model, models.gemma.modeling_gemma.GemmaModel):
+        path_to_layers += ["layers"]
+    elif _is_qwen_decoder_model(base_model):
         path_to_layers += ["layers"]
     else:
         raise NotImplementedError(f"Unknown model type {type(base_model)}")

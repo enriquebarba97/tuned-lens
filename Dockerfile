@@ -1,40 +1,44 @@
-FROM nvidia/cuda:11.8.0-devel-ubuntu22.04 as base
+FROM pytorch/pytorch:2.13.0-cuda13.2-cudnn9-runtime AS base
 
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt update \
-    && apt install -y git tini wget libsndfile1-dev tesseract-ocr espeak-ng python3 python3-pip ffmpeg zstd \
+# Install system dependencies & clean apt cache to keep image size small
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    tini \
+    wget \
+    libsndfile1-dev \
+    tesseract-ocr \
+    espeak-ng \
+    ffmpeg \
+    zstd \
+    && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --upgrade --no-cache-dir pip requests
 
-# install pytorch
-ARG PYTORCH='2.0.1'
-ARG CUDA='cu118'
-
-RUN [ ${#PYTORCH} -gt 0 ] && VERSION='torch=='$PYTORCH'.*' ||  VERSION='torch'; python3 -m pip install --no-cache-dir -U $VERSION --extra-index-url https://download.pytorch.org/whl/$CUDA
-
-# Install requirements for tuned lens repo note this only monitors
-# the pytpoject.toml file for changes
-
-FROM base as prod
-ADD . .
-RUN python3 -m pip install .
-
-FROM base as test
-COPY pyproject.toml setup.cfg /workspace/
+# Production stage
+FROM base AS prod
+COPY . /workspace
 WORKDIR /workspace
-# Have all the dependencies installed so that we can cache them
-RUN mkdir tuned_lens \
-    && python3 -m pip install -e ".[test]" \
-    && python3 -m pip uninstall -y tuned_lens \
-    && rmdir tuned_lens && rm pyproject.toml setup.cfg
+RUN python3 -m pip install --no-cache-dir .
 
-FROM base as dev
-COPY pyproject.toml setup.cfg /workspace/
+# Test stage (caches test dependencies)
+FROM base AS test
+COPY pyproject.toml setup.cfg* /workspace/
 WORKDIR /workspace
 RUN mkdir tuned_lens \
-    && python3 -m pip install -e ".[dev]" \
+    && python3 -m pip install --no-cache-dir -e ".[test]" \
     && python3 -m pip uninstall -y tuned_lens \
-    && rmdir tuned_lens && rm pyproject.toml setup.cfg
+    && rmdir tuned_lens && rm -f pyproject.toml setup.cfg
+
+# Dev stage (caches dev dependencies)
+FROM base AS dev
+COPY pyproject.toml setup.cfg* /workspace/
+WORKDIR /workspace
+RUN mkdir tuned_lens \
+    && python3 -m pip install --no-cache-dir -e ".[dev]" \
+    && python3 -m pip uninstall -y tuned_lens \
+    && rmdir tuned_lens && rm -f pyproject.toml setup.cfg
 
 
 # Example usage:

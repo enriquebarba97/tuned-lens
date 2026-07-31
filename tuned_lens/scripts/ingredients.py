@@ -179,7 +179,7 @@ class Model:
             model = AutoModelForCausalLM.from_pretrained(  # type: ignore
                 self.name,
                 device_map={"": device} if device is not None else None,
-                load_in_8bit=self.precision == "int8",
+               # load_in_8bit=self.precision == "int8",
                 low_cpu_mem_usage=True,
                 revision=self.revision,
                 torch_dtype=dtype,
