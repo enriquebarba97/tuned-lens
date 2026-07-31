@@ -18,7 +18,7 @@ from tqdm.auto import trange
 from transformers import PreTrainedModel
 
 import tuned_lens.scripts.ingredients as ing
-from tuned_lens import TunedLens
+from tuned_lens import TunedLens, LoRALens
 from tuned_lens.utils import maybe_all_reduce, shift_labels, shift_preds
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class State:
     """All of the stateful information in the training loop."""
 
     dataloader: th.utils.data.DataLoader
-    lens: TunedLens
+    lens: Union[TunedLens, LoRALens]
     opts: list[Optimizer]
     schedulers: list[LambdaLR]
     wandb_id: Optional[str]
@@ -132,8 +132,8 @@ class Train:
         if self.checkpoint_dir is None:
             self.checkpoint_dir = self.output / "checkpoints"
 
-    def get_lens(self, model: PreTrainedModel) -> TunedLens:
-        """Load or create a TunedLens model."""
+    def get_lens(self, model: PreTrainedModel) -> Union[TunedLens, LoRALens]:
+        """Load or create a TunedLens or LoRALens model."""
         if self.lens_name_or_path is None:
             logger.info("Randomly initializing lens...")
 
@@ -142,10 +142,11 @@ class Train:
             else:
                 final_norm = None
 
-            lens = TunedLens.from_model(model, final_norm=final_norm)
+            # TODO: Do better if it works
+            lens = LoRALens.from_model(model, final_norm=final_norm)
         else:
             logger.info("Loading pretrained lens...")
-            lens = TunedLens.from_model_and_pretrained(model, self.lens_name_or_path)
+            lens = LoRALens.from_model_and_pretrained(model, self.lens_name_or_path)
 
         lens.float()
         lens_size = sum(p.numel() * p.element_size() for p in lens.parameters())
@@ -169,7 +170,7 @@ class Train:
 
         return runid.generate_id()
 
-    def _init_logging(self, model_name: str, lens: TunedLens, wandb_id: Optional[str]):
+    def _init_logging(self, model_name: str, lens: Union[TunedLens, LoRALens], wandb_id: Optional[str]):
         """Initialize logging to weights and biases."""
         if not self.dist.primary or not self.wandb:
             return
@@ -190,7 +191,7 @@ class Train:
         self,
         step: int,
         losses: dict[str, list[float]],
-        tuned_lens: TunedLens,
+        tuned_lens: Union[TunedLens, LoRALens],
         nats_to_bpb: float,
     ):
         """Log statistics about the training process to weights and biases."""
