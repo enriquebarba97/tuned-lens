@@ -19,6 +19,7 @@ from transformers import PreTrainedModel
 
 import tuned_lens.scripts.ingredients as ing
 from tuned_lens import TunedLens, LoRALens
+from tuned_lens.nn.lenses import LoRATranslator
 from tuned_lens.utils import maybe_all_reduce, shift_labels, shift_preds
 
 logger = logging.getLogger(__name__)
@@ -212,6 +213,10 @@ class Train:
             if isinstance(probe, th.nn.Linear):
                 log_dict["bias_norm/" + name] = probe.bias.data.norm()
                 log_dict["weight_norm/" + name] = probe.weight.data.norm()
+            elif isinstance(probe, LoRATranslator):
+                log_dict["bias_norm/" + name] = probe.lora_bias.data.norm()
+                log_dict["A_norm/" + name] = probe.lora_A.data.norm()
+                log_dict["B_norm/" + name] = probe.lora_B.data.norm()
 
         wandb.log(log_dict)
 
