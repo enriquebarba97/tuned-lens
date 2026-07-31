@@ -214,7 +214,7 @@ class Train:
                 log_dict["bias_norm/" + name] = probe.bias.data.norm()
                 log_dict["weight_norm/" + name] = probe.weight.data.norm()
             elif isinstance(probe, LoRATranslator):
-                log_dict["bias_norm/" + name] = probe.lora_bias.data.norm()
+                log_dict["bias_norm/" + name] = probe.bias.data.norm()
                 log_dict["A_norm/" + name] = probe.lora_A.data.norm()
                 log_dict["B_norm/" + name] = probe.lora_B.data.norm()
 
