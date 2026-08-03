@@ -12,7 +12,7 @@ from simple_parsing import field
 from tqdm.auto import tqdm
 from transformers import PreTrainedModel
 
-from tuned_lens.nn.lenses import Lens, LogitLens, TunedLens
+from tuned_lens.nn.lenses import Lens, LogitLens, TunedLens, LoRALens
 from tuned_lens.scripts.ingredients import (
     Data,
     Distributed,
@@ -81,7 +81,7 @@ class Eval:
         if self.logit:
             lenses["logit"] = LogitLens.from_model(model)
         if self.lens_name is not None:
-            lenses["tuned"] = TunedLens.from_model_and_pretrained(model, self.lens_name)
+            lenses["tuned"] = LoRALens.from_model_and_pretrained(model, self.lens_name)
         return lenses
 
     def calculate_batch_limit(self, tokens_per_sample: int):
